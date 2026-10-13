@@ -78,3 +78,23 @@ jobs:
           git add data.db
           git commit -m "update upload state" || echo "No state changes to commit"
           git push || echo "State push failed; check repository permissions"
+          
+      - name: Validate token JSON
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("tokens/channelA.json")
+          data = json.loads(p.read_text())
+
+          required = ["client_id", "refresh_token", "client_secret"]
+          missing = [key for key in required if not data.get(key)]
+
+          print("Token JSON valid")
+          print("Required fields present:", not missing)
+
+          if missing:
+              raise SystemExit("Missing fields: " + ", ".join(missing))
+          PY
+          
