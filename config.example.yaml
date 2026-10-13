@@ -1,17 +1,15 @@
-# Google Cloud se download kiya OAuth "Desktop app" client secret
+# Copy this into the GitHub Actions secret CONFIG_YAML after replacing UPLOADED_FOLDER_ID.
 client_secret_file: client_secret.json
 timezone: Asia/Kolkata
-anthropic_model: claude-sonnet-5-5   # ANTHROPIC_API_KEY env set ho to titles auto-generate honge
-explore_rate: 0.2                    # 20% uploads naye slots test karenge, baaki best slot pe
+explore_rate: 0.2
 
 channels:
   - name: channelA
-    drive_ready_folder_id: "PASTE_FOLDER_ID"
-    drive_uploaded_folder_id: "PASTE_FOLDER_ID"
-    niche: "tech tips in Hindi"
-    category_id: "28"
-    default_tags: ["tech", "hindi"]
+    drive_ready_folder_id: "19Fcgbj8SAo6kqAOOCRf0KDTTThj7xR_C"
+    drive_uploaded_folder_id: "UPLOADED_FOLDER_ID"
+    niche: "AI facts, science, technology and surprising knowledge"
+    category_id: "27"
+    default_tags: ["FACTORA MINDS", "AI facts", "science facts", "technology", "shorts"]
     is_short: true
-    max_uploads_per_day: 3
-    slots: ["America/New_York 12:00", "America/New_York 17:00", "America/New_York 20:00", "America/Los_Angeles 19:00", "Europe/London 18:00"]
-  # - name: channelB ... (same fields)
+    max_uploads_per_day: 1
+    slots: ["America/New_York 19:00", "Europe/London 18:00", "America/Los_Angeles 19:00"]
