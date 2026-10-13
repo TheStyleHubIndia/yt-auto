@@ -1,7 +1,8 @@
 name: yt-auto
 on:
   schedule:
-    - cron: "0 3 * * *"
+    # 20:00 Asia/Kolkata (14:30 UTC)
+    - cron: "30 14 * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -9,13 +10,23 @@ concurrency: yt-auto
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Write credentials
+      - name: Validate required secrets
+        env:
+          CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
+          TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
+          CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
+        run: |
+          test -n "$CLIENT_SECRET_JSON" || (echo "Missing CLIENT_SECRET_JSON secret" && exit 1)
+          test -n "$TOKEN_CHANNELA_JSON" || (echo "Missing TOKEN_CHANNELA_JSON secret" && exit 1)
+          test -n "$CONFIG_YAML" || (echo "Missing CONFIG_YAML secret" && exit 1)
+      - name: Write credentials and configuration
         env:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
           TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
@@ -29,11 +40,11 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py daily
-      - name: Save state
+      - name: Save upload state
         if: always()
         run: |
           git config user.name "yt-auto-bot"
           git config user.email "bot@users.noreply.github.com"
           git add data.db
-          git commit -m "update state" || echo "no changes"
-          git push || true
+          git commit -m "update upload state" || echo "No state changes to commit"
+          git push || echo "State push failed; check repository permissions"
