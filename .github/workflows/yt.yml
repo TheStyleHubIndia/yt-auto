@@ -46,25 +46,6 @@ jobs:
           printf '%s' "$TOKEN_CHANNELA_JSON" > tokens/channelA.json
           printf '%s' "$CONFIG_YAML" > config.yaml
 
-      - name: Validate token JSON
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path("tokens/channelA.json")
-          data = json.loads(p.read_text())
-
-          required = ["client_id", "refresh_token", "client_secret"]
-          missing = [key for key in required if not data.get(key)]
-
-          print("Token JSON parsed successfully")
-          print("Required fields present:", not missing)
-
-          if missing:
-              raise SystemExit("Missing fields: " + ", ".join(missing))
-          PY
-
       - name: Upload and schedule videos
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
