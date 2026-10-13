@@ -1,60 +1,62 @@
 # FACTORA MINDS — Drive to YouTube Shorts Automation
 
-This repository checks a Google Drive folder daily, generates English metadata (Gemini when configured; otherwise a basic template), uploads one Short, schedules it, and moves the source video to an Uploaded folder. It uses the YouTube Data API and Google OAuth; **fully automatic uploading is not possible without YouTube authorization/API access**.
+This repository is configured to check Google Drive daily, schedule up to **3 Shorts per day**, generate metadata, analyze older uploads, learn which publishing slots perform better, and move successfully uploaded source videos to an Uploaded folder. It uses YouTube Data API and Google OAuth; automatic uploading requires that authorization to be completed.
 
-## Schedule
-- Daily at **8:00 PM India time** (GitHub Actions cron: 14:30 UTC).
-- One video per run by default.
-- Use the **Actions → yt-auto → Run workflow** button for a manual run.
-- Check the Actions run logs before assuming an upload succeeded.
+## Schedule and learning
+- GitHub Actions runs daily at **8:00 PM India time** (14:30 UTC).
+- Each run attempts to schedule 3 videos in **three distinct configured time slots**, subject to videos being available, valid future slots, YouTube API quota, and successful authorization.
+- Starting slots are test candidates, not a guarantee of peak audience times. The learner uses channel analytics from videos at least 48 hours old to compare performance and gradually favor better-performing slots.
+- Analytics are refreshed on each daily run. The local `data.db` stores views, average view duration, average view percentage, minutes watched, score, and selected slot; the workflow commits this state back to the repository.
+- To inspect analytics, open Actions → yt-auto → latest run logs. For a manual run, select **Run workflow**.
+- YouTube Studio → Analytics → Audience → “When your viewers are on YouTube” is the best first-party reference for audience activity when enough data is available: https://support.google.com/youtube/answer/9314416
 
 ## One-time setup
 
 ### 1. Google Drive folders
-- Ready/source folder ID is already set to `19Fcgbj8SAo6kqAOOCRf0KDTTThj7xR_C`.
-- Create a second Drive folder named `Uploaded`; copy its folder ID from the URL. The automation moves successfully uploaded videos there.
+- Ready/source folder ID: `19Fcgbj8SAo6kqAOOCRf0KDTTThj7xR_C`.
+- Create a second Drive folder named `Uploaded`; copy its folder ID from the URL and replace `UPLOADED_FOLDER_ID` in `config.yaml`.
 - Ensure the Google account used for OAuth can access both folders.
 
 ### 2. Google Cloud OAuth
 1. Open Google Cloud Console and select/create a project.
 2. Enable **YouTube Data API v3**, **YouTube Analytics API**, and **Google Drive API**.
-3. Configure OAuth consent screen. Add your Google account as a test user if the app is in Testing.
+3. Configure the OAuth consent screen. Add your Google account as a test user if the app is in Testing.
 4. Create an OAuth Client ID of type **Desktop app** and download its JSON file.
-5. On a computer with Python installed, put that file in this repo folder as `client_secret.json`, then run:
+5. On a computer with Python installed, place it in the repo folder as `client_secret.json`, then run:
    ```bash
    pip install -r requirements.txt
    cp config.example.yaml config.yaml
    # edit config.yaml and set drive_uploaded_folder_id
    python main.py auth channelA
    ```
-   Sign in using the exact Google/YouTube account that owns the FACTORA MINDS channel. This creates `tokens/channelA.json`.
-6. Do not commit either JSON file to GitHub.
+   Sign in with the Google account that owns/manages the FACTORA MINDS YouTube channel. This creates `tokens/channelA.json`.
+6. Never commit OAuth JSON files or tokens to GitHub.
 
 ### 3. Add GitHub Actions secrets
-Open **GitHub → TheStyleHubIndia/yt-auto → Settings → Secrets and variables → Actions → New repository secret**. Add:
-
+Open **Settings → Secrets and variables → Actions → New repository secret** in this repository and add:
 - `CLIENT_SECRET_JSON`: entire contents of downloaded `client_secret.json`.
 - `TOKEN_CHANNELA_JSON`: entire contents of `tokens/channelA.json`.
-- `CONFIG_YAML`: entire contents of your edited `config.yaml`.
-- `GEMINI_API_KEY` (optional): Gemini API key for generated titles, descriptions and hashtags. If omitted, basic template metadata is used.
+- `CONFIG_YAML`: entire contents of edited `config.yaml`.
+- `GEMINI_API_KEY` (optional): Gemini key for AI-generated title, description and hashtags. Without it, basic template metadata is used.
 
-Never paste these secrets into chat or commit them to the repository. If you rotate OAuth credentials/token, update the matching GitHub secret.
+Do not paste secrets into chat or commit them to the repository.
 
-### 4. Test before relying on the schedule
-1. Open the **Actions** tab and select **yt-auto**.
-2. Click **Run workflow**.
-3. Open the latest run and read the logs. Confirm it says the video was scheduled and shows a YouTube URL.
-4. Confirm the source video moved to the Uploaded folder and verify its scheduled date/time in YouTube Studio.
+### 4. Test
+1. Open the Actions tab and select `yt-auto`.
+2. Click **Run workflow** and inspect logs.
+3. Confirm three videos are scheduled (or read the exact reason fewer were scheduled).
+4. Verify the scheduled dates in YouTube Studio and that processed videos moved to Uploaded.
 
 ## Optional per-video metadata
-Place a JSON file next to a video in the Ready folder with the same base filename, for example `clip01.json` for `clip01.mp4`:
+Place a JSON file next to a video with the same base filename, e.g. `clip01.json` for `clip01.mp4`:
 ```json
 {"title":"A surprising AI fact","description":"A short, accurate explanation.\n\n#Shorts #AI #Facts","tags":["AI","facts","technology"]}
 ```
-This overrides generated metadata fields you provide.
+Fields supplied in this file override generated metadata.
 
 ## Important limitations
-- GitHub Actions is free within applicable usage limits; Google API quota and account restrictions still apply.
-- YouTube may initially keep API-uploaded videos private until the API project meets YouTube's audit requirements.
-- Scheduled publish time is selected from the configured slots; test timezone and scheduling in YouTube Studio.
-- Only upload videos you own or have permission to use. Avoid misleading metadata, repetitive mass uploads, and unlicensed material.
+- Three uploads per day are a target, not guaranteed; Drive files, API quota, OAuth, upload limits, and configured slots can affect the count.
+- YouTube Analytics data can be delayed. The learning loop only evaluates videos at least 48 hours old and adapts based on the data returned.
+- Peak times vary by audience. Initial slots are hypotheses; validate them against YouTube Studio audience activity and actual video performance.
+- API-uploaded videos may be restricted to private visibility until the API project meets YouTube's audit requirements.
+- Upload only content you own or have permission to use. Avoid misleading metadata, repetitive mass uploads, and unlicensed material.
