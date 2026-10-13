@@ -1,22 +1,30 @@
 name: yt-auto
+
 on:
   schedule:
     # 20:00 Asia/Kolkata (14:30 UTC)
     - cron: "30 14 * * *"
   workflow_dispatch:
+
 permissions:
   contents: write
+
 concurrency: yt-auto
+
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - run: pip install -r requirements.txt
+
       - name: Validate required secrets
         env:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
@@ -26,6 +34,7 @@ jobs:
           test -n "$CLIENT_SECRET_JSON" || (echo "Missing CLIENT_SECRET_JSON secret" && exit 1)
           test -n "$TOKEN_CHANNELA_JSON" || (echo "Missing TOKEN_CHANNELA_JSON secret" && exit 1)
           test -n "$CONFIG_YAML" || (echo "Missing CONFIG_YAML secret" && exit 1)
+
       - name: Write credentials and configuration
         env:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
@@ -36,19 +45,8 @@ jobs:
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_CHANNELA_JSON" > tokens/channelA.json
           printf '%s' "$CONFIG_YAML" > config.yaml
-      - name: Upload and schedule videos
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python main.py daily
-      - name: Save upload state
-        if: always()
-        run: |
-          git config user.name "yt-auto-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add data.db
-          git commit -m "update upload state" || echo "No state changes to commit"
-          git push || echo "State push failed; check repository permissions"
-                - name: Validate token JSON
+
+      - name: Validate token JSON
         run: |
           python - <<'PY'
           import json
@@ -60,9 +58,23 @@ jobs:
           required = ["client_id", "refresh_token", "client_secret"]
           missing = [key for key in required if not data.get(key)]
 
-          print("Token JSON valid")
+          print("Token JSON parsed successfully")
           print("Required fields present:", not missing)
 
           if missing:
               raise SystemExit("Missing fields: " + ", ".join(missing))
           PY
+
+      - name: Upload and schedule videos
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py daily
+
+      - name: Save upload state
+        if: always()
+        run: |
+          git config user.name "yt-auto-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data.db
+          git commit -m "update upload state" || echo "No state changes to commit"
+          git push || echo "State push failed; check repository permissions"
