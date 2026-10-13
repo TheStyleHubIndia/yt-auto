@@ -46,6 +46,32 @@ jobs:
           printf '%s' "$TOKEN_CHANNELA_JSON" > tokens/channelA.json
           printf '%s' "$CONFIG_YAML" > config.yaml
 
+      - name: Validate token JSON
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("tokens/channelA.json")
+          data = json.loads(p.read_text())
+
+          if not isinstance(data, dict):
+              raise SystemExit("TOKEN_CHANNELA_JSON must be the complete OAuth token JSON object.")
+
+          required = ["client_id", "refresh_token", "client_secret"]
+          missing = [key for key in required if not data.get(key)]
+
+          if missing:
+              print("Top-level token JSON keys:", ", ".join(sorted(data.keys())))
+              raise SystemExit(
+                  "TOKEN_CHANNELA_JSON is not the correct authorized-user token. "
+                  "Missing top-level fields: " + ", ".join(missing) +
+                  ". Replace this GitHub Secret with the complete contents of tokens/channelA.json."
+              )
+
+          print("Token JSON valid; required OAuth fields are present.")
+          PY
+
       - name: Upload and schedule videos
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
