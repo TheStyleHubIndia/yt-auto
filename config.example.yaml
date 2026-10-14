@@ -4,8 +4,10 @@ explore_rate: 0.15
 
 channels:
   - name: channelA
-    drive_ready_folder_id: "1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5"
-    drive_uploaded_folder_id: "UPLOADED_FOLDER_ID"
+    
+drive_ready_folder_id: "1yyo5qf6kbcNgeYqQ23gajc6aHpl8hG7l"
+drive_uploaded_folder_id: "1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5"
+
     niche: "AI facts, science, technology and surprising knowledge"
     category_id: "27"
     default_tags: ["FACTORA MINDS", "AI facts", "science facts", "technology", "shorts"]
