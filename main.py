@@ -11,12 +11,23 @@ import uploader
 
 
 def next_publish_time(con, ch, slot, tz, max_per_day):
-    """Find the next valid publish time in the selected slot's own timezone."""
-    if " " in slot:
-        zone, hhmm = slot.rsplit(" ", 1)
+    """Find the next valid publish time in the selected slot's own timezone.
+
+    Accept both "America/New_York 12:00" and "12:00 America/New_York".
+    A slot containing only "12:00" uses the channel's default timezone.
+    """
+    parts = slot.split()
+    if len(parts) == 2:
+        if ":" in parts[0]:
+            hhmm, zone = parts
+        else:
+            zone, hhmm = parts
         tz = ZoneInfo(zone)
+    elif len(parts) == 1:
+        hhmm = parts[0]
     else:
-        hhmm = slot
+        raise ValueError(f"Invalid slot '{slot}'. Use 'Area/City HH:MM' or 'HH:MM Area/City'.")
+
     h, mi = map(int, hhmm.split(":"))
     now = datetime.now(tz)
     for d in range(0, 14):
@@ -53,7 +64,6 @@ def run_channel(cfg, channel, con, used_slots=None):
         print(f"[{ch}] ready folder empty; nothing to upload")
         return False
 
-    # If upload already succeeded but Drive move failed, finish the move instead of duplicating it.
     previous = con.execute(
         "SELECT video_id FROM uploads WHERE channel=? AND source_file_id=?",
         (ch, video["id"]),
