@@ -5,14 +5,16 @@ on:
     paths:
       - ".github/workflows/yt.yml"
   schedule:
-    # 20:00 Asia/Kolkata (14:30 UTC)
+    # Daily 20:00 Asia/Kolkata (14:30 UTC)
     - cron: "30 14 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
-concurrency: yt-auto
+concurrency:
+  group: yt-auto
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -25,8 +27,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Validate required secrets
         env:
@@ -34,9 +38,9 @@ jobs:
           TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
           CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
         run: |
-          test -n "$CLIENT_SECRET_JSON" || (echo "Missing CLIENT_SECRET_JSON secret" && exit 1)
-          test -n "$TOKEN_CHANNELA_JSON" || (echo "Missing TOKEN_CHANNELA_JSON secret" && exit 1)
-          test -n "$CONFIG_YAML" || (echo "Missing CONFIG_YAML secret" && exit 1)
+          test -n "$CLIENT_SECRET_JSON" || (echo "::error::Missing CLIENT_SECRET_JSON secret" && exit 1)
+          test -n "$TOKEN_CHANNELA_JSON" || (echo "::error::Missing TOKEN_CHANNELA_JSON secret" && exit 1)
+          test -n "$CONFIG_YAML" || (echo "::error::Missing CONFIG_YAML secret" && exit 1)
 
       - name: Write credentials and configuration
         env:
@@ -48,56 +52,51 @@ jobs:
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_CHANNELA_JSON" > tokens/channelA.json
           printf '%s' "$CONFIG_YAML" > config.yaml
+          chmod 600 client_secret.json tokens/channelA.json config.yaml
 
-      - name: Validate token JSON
+      - name: Validate configuration and OAuth JSON
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
+          import yaml
 
-          p = Path("tokens/channelA.json")
-          data = json.loads(p.read_text())
-
-          if not isinstance(data, dict):
-              raise SystemExit("TOKEN_CHANNELA_JSON must be the complete OAuth token JSON object.")
-
-          required = ["client_id", "refresh_token", "client_secret"]
-          missing = [key for key in required if not data.get(key)]
-
-          if missing:
-              print("Top-level token JSON keys:", ", ".join(sorted(data.keys())))
+          token = json.loads(Path("tokens/channelA.json").read_text())
+          required_token_fields = ["client_id", "refresh_token", "client_secret"]
+          missing_token_fields = [key for key in required_token_fields if not token.get(key)]
+          if missing_token_fields:
               raise SystemExit(
-                  "TOKEN_CHANNELA_JSON is not the correct authorized-user token. "
-                  "Missing top-level fields: " + ", ".join(missing) +
-                  ". Replace this GitHub Secret with the complete contents of tokens/channelA.json."
+                  "TOKEN_CHANNELA_JSON is missing required fields: "
+                  + ", ".join(missing_token_fields)
               )
+          print("OAuth token JSON: valid")
 
-          print("Token JSON valid; required OAuth fields are present.")
+          try:
+              config = yaml.safe_load(Path("config.yaml").read_text())
+          except yaml.YAMLError as exc:
+              mark = getattr(exc, "problem_mark", None)
+              where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+              raise SystemExit(
+                  "CONFIG_YAML secret is invalid YAML" + where
+                  + ". Copy config.example.yaml exactly, preserve indentation, and use spaces (not tabs)."
+              ) from exc
+
+          if not isinstance(config, dict) or not isinstance(config.get("channels"), list) or not config["channels"]:
+              raise SystemExit("CONFIG_YAML must contain top-level timezone/client_secret_file and a non-empty channels list.")
+          for channel in config["channels"]:
+              for key in ("name", "drive_ready_folder_id", "drive_uploaded_folder_id", "niche", "category_id", "slots"):
+                  if not channel.get(key):
+                      raise SystemExit(f"Channel config is missing required field: {key}")
+              if channel["drive_uploaded_folder_id"] == "UPLOADED_FOLDER_ID":
+                  raise SystemExit("Replace UPLOADED_FOLDER_ID with the real destination Drive folder ID.")
+          print("YAML config: valid")
           PY
 
       - name: Upload and schedule videos
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-2.5-flash
         run: python main.py daily
-
-      - name: Validate token JSON
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path("tokens/channelA.json")
-          data = json.loads(p.read_text())
-
-          required = ["client_id", "refresh_token", "client_secret"]
-          missing = [key for key in required if not data.get(key)]
-
-          print("Token JSON valid")
-          print("Required fields present:", not missing)
-
-          if missing:
-              raise SystemExit("Missing fields: " + ", ".join(missing))
-          PY
 
       - name: Save upload state
         if: always()
@@ -105,5 +104,9 @@ jobs:
           git config user.name "yt-auto-bot"
           git config user.email "bot@users.noreply.github.com"
           git add data.db
-          git commit -m "update upload state" || echo "No state changes to commit"
-          git push || echo "State push failed; check repository permissions"
+          if git diff --cached --quiet; then
+            echo "No upload-state changes to save."
+          else
+            git commit -m "update upload state"
+            git push
+          fi
