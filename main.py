@@ -107,8 +107,18 @@ def run_channel(cfg, channel, con, used_slots=None):
         or len(description_hashtags) < 3
     ):
         best, worst = learner.title_insights(con, ch)
-        generated = titles.generate(cfg, channel, video["name"], best, worst)
-        # Preserve valid custom metadata, but fill missing fields from Gemini.
+        try:
+            generated = titles.generate(cfg, channel, video["name"], best, worst)
+            print(f"[{ch}] metadata generated with Gemini")
+        except Exception as exc:
+            # API quota/network/model errors must not prevent the daily pipeline from
+            # scheduling a video. Clearly log that this run used deterministic metadata.
+            print(
+                f"[{ch}] WARNING: Gemini metadata unavailable ({type(exc).__name__}: {exc}); "
+                "using topic-based fallback metadata"
+            )
+            generated = titles.template_meta(channel["niche"], video["name"])
+        # Preserve valid custom metadata, but fill missing fields from Gemini or fallback.
         meta = {
             "title": meta.get("title") or generated.get("title"),
             "description": meta.get("description") or generated.get("description"),
