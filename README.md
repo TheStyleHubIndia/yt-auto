@@ -13,7 +13,7 @@ This repository is configured to check Google Drive daily, schedule up to **3 Sh
 ## One-time setup
 
 ### 1. Google Drive folders
-- Ready/source folder ID: `19Fcgbj8SAo6kqAOOCRf0KDTTThj7xR_C`.
+- Ready/source folder ID currently shown in `config.example.yaml`: `1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5`. Confirm this is the folder containing videos before running.
 - Create a second Drive folder named `Uploaded`; copy its folder ID from the URL and replace `UPLOADED_FOLDER_ID` in `config.yaml`.
 - Ensure the Google account used for OAuth can access both folders.
 
@@ -37,14 +37,14 @@ Open **Settings → Secrets and variables → Actions → New repository secret*
 - `CLIENT_SECRET_JSON`: entire contents of downloaded `client_secret.json`.
 - `TOKEN_CHANNELA_JSON`: entire contents of `tokens/channelA.json`.
 - `CONFIG_YAML`: entire contents of edited `config.yaml`.
-- `GEMINI_API_KEY` (optional): Gemini key for AI-generated title, description and hashtags. Without it, basic template metadata is used.
+- `GEMINI_API_KEY` (optional but recommended): Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. Without it, metadata is generated from the filename and channel niche; the program does not inspect/transcribe the video content.
 
 Do not paste secrets into chat or commit them to the repository.
 
 ### 4. Test
 1. Open the Actions tab and select `yt-auto`.
 2. Click **Run workflow** and inspect logs.
-3. Confirm three videos are scheduled (or read the exact reason fewer were scheduled).
+3. Confirm videos are scheduled (up to 3 per run; fewer may be scheduled if the folder is empty or a configured slot is unavailable).
 4. Verify the scheduled dates in YouTube Studio and that processed videos moved to Uploaded.
 
 ## Optional per-video metadata
