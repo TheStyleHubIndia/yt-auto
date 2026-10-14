@@ -3,8 +3,8 @@
 This repository is configured to check Google Drive daily, schedule up to **3 Shorts per day**, generate metadata, analyze older uploads, learn which publishing slots perform better, and move successfully uploaded source videos to an Uploaded folder. It uses YouTube Data API and Google OAuth; automatic uploading requires that authorization to be completed.
 
 ## Schedule and learning
-- GitHub Actions runs daily at **8:00 PM India time** (14:30 UTC).
-- Each run attempts to schedule 3 videos in **three distinct configured time slots**, subject to videos being available, valid future slots, YouTube API quota, and successful authorization.
+- GitHub Actions runs daily at **12:10 AM India time** (18:40 UTC on the previous UTC date).
+- Each run attempts to schedule up to 3 videos in the configured India slots (**12:30 PM, 6:30 PM, and 9:00 PM IST**), subject to Drive files, YouTube API quota, and successful authorization. These are starting time choices; the analytics learner can help refine performance over time.
 - Starting slots are test candidates, not a guarantee of peak audience times. The learner uses channel analytics from videos at least 48 hours old to compare performance and gradually favor better-performing slots.
 - Analytics are refreshed on each daily run. The local `data.db` stores views, average view duration, average view percentage, minutes watched, score, and selected slot; the workflow commits this state back to the repository.
 - To inspect analytics, open Actions → yt-auto → latest run logs. For a manual run, select **Run workflow**.
@@ -36,8 +36,7 @@ This repository is configured to check Google Drive daily, schedule up to **3 Sh
 Open **Settings → Secrets and variables → Actions → New repository secret** in this repository and add:
 - `CLIENT_SECRET_JSON`: entire contents of downloaded `client_secret.json`.
 - `TOKEN_CHANNELA_JSON`: entire contents of `tokens/channelA.json`.
-- `CONFIG_YAML`: entire contents of edited `config.yaml`. Keep each slot in `Area/City HH:MM` or `HH:MM Area/City` format; both are supported.
-- `GEMINI_API_KEY` (required): Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. The daily workflow stops before uploading a video if Gemini metadata cannot be generated; it does not silently publish filename-based fallback metadata.
+- `GEMINI_API_KEY`: Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. If Gemini quota or service errors occur, the pipeline logs a warning and uses safe topic-based fallback metadata so scheduling can continue. The active schedule and folder configuration are controlled by `config.example.yaml` in the repository.
 
 Do not paste secrets into chat or commit them to the repository.
 
@@ -57,6 +56,6 @@ Fields supplied in this file override generated metadata.
 ## Important limitations
 - Three uploads per day are a target, not guaranteed; Drive files, API quota, OAuth, YouTube account upload limits, and configured slots can affect the count. If YouTube returns `uploadLimitExceeded`, wait for the account limit to reset and check YouTube Studio before rerunning.
 - YouTube Analytics data can be delayed. The learning loop only evaluates videos at least 48 hours old and adapts based on the data returned.
-- Peak times vary by audience. Initial slots are hypotheses; validate them against YouTube Studio audience activity and actual video performance.
+- Peak times vary by audience. The initial India slots are practical starting points, not guaranteed peak times; validate them against YouTube Studio audience activity and actual video performance.
 - API-uploaded videos may be restricted to private visibility until the API project meets YouTube's audit requirements.
 - Upload only content you own or have permission to use. Avoid misleading metadata, repetitive mass uploads, and unlicensed material.
