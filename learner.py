@@ -36,13 +36,14 @@ def slot_stats(con, ch):
 
 def choose_slot(con, ch, slots, explore_rate):
     """Epsilon-greedy: kam-test hue slots ko pehle try karo, phir best ko exploit."""
-    stats = slot_stats(con, ch)
+    # Only consider slots that still exist in the current configuration.
+    stats = {slot: value for slot, value in slot_stats(con, ch).items() if slot in slots}
     untested = [s for s in slots if stats.get(s, (0, 0))[1] < 3]
     if untested and (random.random() < 0.7 or len(untested) == len(slots)):
         return random.choice(untested)
     if random.random() < explore_rate or not stats:
         return random.choice(slots)
-    return max(stats, key=lambda s: stats[s][0])
+    return max((s for s in slots if s in stats), key=lambda s: stats[s][0], default=random.choice(slots))
 
 def title_features(t):
     return {"has_number": bool(re.search(r"\d", t)), "is_question": "?" in t,
