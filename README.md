@@ -13,8 +13,8 @@ This repository is configured to check Google Drive daily, schedule up to **3 Sh
 ## One-time setup
 
 ### 1. Google Drive folders
-- Ready/source folder ID currently shown in `config.example.yaml`: `1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5`. Confirm this is the folder containing videos before running.
-- Create a second Drive folder named `Uploaded`; copy its folder ID from the URL and replace `UPLOADED_FOLDER_ID` in `config.yaml`.
+- Ready/source folder ID: `1yyo5qf6kbcNgeYqQ23gajc6aHpl8hG7l`. Put videos to be scheduled in this folder.
+- Uploaded/destination folder ID: `1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5`. Successfully processed source videos are moved here.
 - Ensure the Google account used for OAuth can access both folders.
 
 ### 2. Google Cloud OAuth
@@ -36,7 +36,7 @@ This repository is configured to check Google Drive daily, schedule up to **3 Sh
 Open **Settings → Secrets and variables → Actions → New repository secret** in this repository and add:
 - `CLIENT_SECRET_JSON`: entire contents of downloaded `client_secret.json`.
 - `TOKEN_CHANNELA_JSON`: entire contents of `tokens/channelA.json`.
-- `CONFIG_YAML`: entire contents of edited `config.yaml`.
+- `CONFIG_YAML`: entire contents of edited `config.yaml`. Keep each slot in `Area/City HH:MM` or `HH:MM Area/City` format; both are supported.
 - `GEMINI_API_KEY` (optional but recommended): Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. Without it, metadata is generated from the filename and channel niche; the program does not inspect/transcribe the video content.
 
 Do not paste secrets into chat or commit them to the repository.
