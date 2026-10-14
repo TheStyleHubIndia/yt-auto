@@ -52,8 +52,23 @@ def _parse(txt):
 def _gemini(prompt):
     import urllib.request
     key = os.environ["GEMINI_API_KEY"]
-    preferred = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    preferred = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
     models = list(dict.fromkeys([preferred, "gemini-2.5-flash", "gemini-2.0-flash"]))
+    # Discover models available to this key; availability differs by project.
+    try:
+        list_req = urllib.request.Request(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            headers={"x-goog-api-key": key},
+        )
+        with urllib.request.urlopen(list_req, timeout=30) as response:
+            available = json.loads(response.read()).get("models", [])
+        discovered = [
+            item["name"].split("/")[-1] for item in available
+            if item.get("name") and "generateContent" in item.get("supportedGenerationMethods", [])
+        ]
+        models = list(dict.fromkeys([preferred] + discovered + models))
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        pass
     errors = []
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
@@ -76,7 +91,11 @@ def _gemini(prompt):
             return text
         except HTTPError as exc:
             # A missing/unsupported model can be retried using a known model.
-            errors.append("%s: HTTP %s" % (model, exc.code))
+            try:
+                api_detail = exc.read().decode("utf-8", "replace")[:500]
+            except Exception:
+                api_detail = ""
+            errors.append("%s: HTTP %s %s" % (model, exc.code, api_detail))
             if exc.code not in (400, 404):
                 raise RuntimeError("Gemini API request failed (%s)" % exc.code) from exc
         except (URLError, TimeoutError) as exc:
