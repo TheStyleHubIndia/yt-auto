@@ -4,17 +4,14 @@ explore_rate: 0.15
 
 channels:
   - name: channelA
-    
-drive_ready_folder_id: "1yyo5qf6kbcNgeYqQ23gajc6aHpl8hG7l"
-drive_uploaded_folder_id: "1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5"
-
+    drive_ready_folder_id: "1yyo5qf6kbcNgeYqQ23gajc6aHpl8hG7l"
+    drive_uploaded_folder_id: "1PVOAlPtbJXLsS0L8J-cULdVGXr2B-ih5"
     niche: "AI facts, science, technology and surprising knowledge"
     category_id: "27"
     default_tags: ["FACTORA MINDS", "AI facts", "science facts", "technology", "shorts"]
     is_short: true
     max_uploads_per_day: 3
-    # Starting test slots for a US/UK/Canada/Australia-oriented English channel.
-    # After enough results, the learner favors slots with better channel-specific analytics.
+    # Slot format: IANA timezone followed by local 24-hour time.
     slots:
       - "America/New_York 12:00"
       - "America/New_York 17:00"
