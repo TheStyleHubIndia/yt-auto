@@ -1,11 +1,22 @@
 import io, json, os, tempfile
 from googleapiclient.http import MediaIoBaseDownload
 
-def next_video(drive, folder_id):
+def next_video(drive, folder_id, exclude_ids=None):
+    """Return the oldest unprocessed video; skip IDs already recorded in uploads."""
     q = f"'{folder_id}' in parents and trashed=false and mimeType contains 'video/'"
-    r = drive.files().list(q=q, orderBy="createdTime", pageSize=1,
-                           fields="files(id,name)").execute()
-    return (r.get("files") or [None])[0]
+    excluded = set(exclude_ids or ())
+    page_token = None
+    while True:
+        r = drive.files().list(
+            q=q, orderBy="createdTime", pageSize=100,
+            pageToken=page_token, fields="nextPageToken,files(id,name)",
+        ).execute()
+        for item in r.get("files", []):
+            if item.get("id") not in excluded:
+                return item
+        page_token = r.get("nextPageToken")
+        if not page_token:
+            return None
 
 def sidecar_meta(drive, folder_id, video_name):
     """Optional: 'myvideo.json' (title/description/tags) video ke saath folder me rakho."""
