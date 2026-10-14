@@ -8,8 +8,9 @@ on:
       - "requirements.txt"
       - "config.example.yaml"
   schedule:
-    # Daily 20:00 Asia/Kolkata (14:30 UTC)
-    - cron: "30 14 * * *"
+    # Daily 00:10 Asia/Kolkata (18:40 UTC on the previous UTC date).
+    # This lets the job schedule all three same-day India slots in advance.
+    - cron: "40 18 * * *"
   workflow_dispatch:
 
 permissions:
@@ -39,24 +40,21 @@ jobs:
         env:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
           TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
-          CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           test -n "$GEMINI_API_KEY" || (echo "::error::Missing GEMINI_API_KEY secret. Add it in GitHub Actions secrets." && exit 1)
           test -n "$CLIENT_SECRET_JSON" || (echo "::error::Missing CLIENT_SECRET_JSON secret" && exit 1)
           test -n "$TOKEN_CHANNELA_JSON" || (echo "::error::Missing TOKEN_CHANNELA_JSON secret" && exit 1)
-          test -n "$CONFIG_YAML" || (echo "::error::Missing CONFIG_YAML secret" && exit 1)
 
       - name: Write credentials and configuration
         env:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
           TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
-          CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
         run: |
           mkdir -p tokens
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_CHANNELA_JSON" > tokens/channelA.json
-          printf '%s' "$CONFIG_YAML" > config.yaml
+          cp config.example.yaml config.yaml
           chmod 600 client_secret.json tokens/channelA.json config.yaml
 
       - name: Validate configuration and OAuth JSON
@@ -82,12 +80,12 @@ jobs:
               mark = getattr(exc, "problem_mark", None)
               where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
               raise SystemExit(
-                  "CONFIG_YAML secret is invalid YAML" + where
+                  "config.example.yaml is invalid YAML" + where
                   + ". Copy config.example.yaml exactly, preserve indentation, and use spaces (not tabs)."
               ) from exc
 
           if not isinstance(config, dict) or not isinstance(config.get("channels"), list) or not config["channels"]:
-              raise SystemExit("CONFIG_YAML must contain top-level timezone/client_secret_file and a non-empty channels list.")
+              raise SystemExit("config.example.yaml must contain top-level timezone/client_secret_file and a non-empty channels list.")
           for channel in config["channels"]:
               for key in ("name", "drive_ready_folder_id", "drive_uploaded_folder_id", "niche", "category_id", "slots"):
                   if not channel.get(key):
