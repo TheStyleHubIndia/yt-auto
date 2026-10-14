@@ -110,5 +110,13 @@ jobs:
             echo "No upload-state changes to save."
           else
             git commit -m "update upload state"
-            git push
+            # Another commit may land while the workflow is running.
+            # Rebase before pushing so the state commit does not fail on a stale main.
+            git fetch origin main
+            git rebase origin/main || {
+              echo "::error::Could not safely rebase upload state. Resolve data.db conflict before retrying."
+              git rebase --abort
+              exit 1
+            }
+            git push origin HEAD:main
           fi
