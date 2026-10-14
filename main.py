@@ -148,10 +148,21 @@ def run_channel(cfg, channel, con, used_slots=None):
     path = drive_io.download(drive, video["id"], video["name"])
     try:
         publish_iso = when.astimezone(timezone.utc).isoformat()
-        video_id = uploader.upload(
-            yt, path, meta, publish_iso, channel["category_id"],
-            channel.get("default_tags", []), channel.get("is_short", True),
-        )
+        try:
+            video_id = uploader.upload(
+                yt, path, meta, publish_iso, channel["category_id"],
+                channel.get("default_tags", []), channel.get("is_short", True),
+            )
+        except Exception as exc:
+            # YouTube enforces account-level upload limits; code cannot bypass them.
+            # Keep the source in Ready and let the next scheduled run retry later.
+            if "uploadLimitExceeded" in str(exc) or "exceeded the number of videos they may upload" in str(exc):
+                print(
+                    f"[{ch}] WARNING: YouTube account upload limit reached. "
+                    "No source video was moved; it will remain in Ready for a later retry."
+                )
+                return False
+            raise
         con.execute(
             "INSERT INTO uploads(video_id,channel,title,slot,publish_at,source_file_id) VALUES(?,?,?,?,?,?)",
             (video_id, ch, meta["title"], slot, publish_iso, video["id"]),
