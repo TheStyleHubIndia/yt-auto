@@ -77,15 +77,14 @@ def _claude(cfg, prompt):
 
 
 def generate(cfg, channel, filename, best, worst):
+    """Generate metadata with Gemini; never silently upload without AI metadata."""
+    if not os.getenv("GEMINI_API_KEY"):
+        raise RuntimeError("GEMINI_API_KEY is missing. Add it to GitHub Actions secrets.")
     prompt = _prompt(channel, filename, best, worst)
     try:
-        if os.getenv("GEMINI_API_KEY"):
-            return _parse(_gemini(prompt))
-        if os.getenv("ANTHROPIC_API_KEY"):
-            return _parse(_claude(cfg, prompt))
+        return _parse(_gemini(prompt))
     except Exception as exc:
-        print("AI metadata generation failed; using filename-based fallback:", exc)
-    return template_meta(channel["niche"], filename)
+        raise RuntimeError(f"Gemini metadata generation failed: {exc}") from exc
 
 
 def template_meta(niche, filename=""):
