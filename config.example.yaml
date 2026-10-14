@@ -11,10 +11,9 @@ channels:
     default_tags: ["FACTORA MINDS", "AI facts", "science facts", "technology", "shorts"]
     is_short: true
     max_uploads_per_day: 3
-    # Slot format: IANA timezone followed by local 24-hour time.
+    # India-time publishing slots. The daily workflow runs shortly after midnight IST,
+    # so all three slots are in the future on the same local day.
     slots:
-      - "America/New_York 12:00"
-      - "America/New_York 17:00"
-      - "America/New_York 20:00"
-      - "America/Los_Angeles 19:00"
-      - "Europe/London 18:00"
+      - "Asia/Kolkata 12:30"
+      - "Asia/Kolkata 18:30"
+      - "Asia/Kolkata 21:00"
