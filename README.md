@@ -37,7 +37,7 @@ Open **Settings → Secrets and variables → Actions → New repository secret*
 - `CLIENT_SECRET_JSON`: entire contents of downloaded `client_secret.json`.
 - `TOKEN_CHANNELA_JSON`: entire contents of `tokens/channelA.json`.
 - `CONFIG_YAML`: entire contents of edited `config.yaml`. Keep each slot in `Area/City HH:MM` or `HH:MM Area/City` format; both are supported.
-- `GEMINI_API_KEY` (optional but recommended): Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. Without it, metadata is generated from the filename and channel niche; the program does not inspect/transcribe the video content.
+- `GEMINI_API_KEY` (required): Gemini key for AI-generated titles, descriptions, tags, and relevant hashtags. The daily workflow stops before uploading a video if Gemini metadata cannot be generated; it does not silently publish filename-based fallback metadata.
 
 Do not paste secrets into chat or commit them to the repository.
 
@@ -55,7 +55,7 @@ Place a JSON file next to a video with the same base filename, e.g. `clip01.json
 Fields supplied in this file override generated metadata.
 
 ## Important limitations
-- Three uploads per day are a target, not guaranteed; Drive files, API quota, OAuth, upload limits, and configured slots can affect the count.
+- Three uploads per day are a target, not guaranteed; Drive files, API quota, OAuth, YouTube account upload limits, and configured slots can affect the count. If YouTube returns `uploadLimitExceeded`, wait for the account limit to reset and check YouTube Studio before rerunning.
 - YouTube Analytics data can be delayed. The learning loop only evaluates videos at least 48 hours old and adapts based on the data returned.
 - Peak times vary by audience. Initial slots are hypotheses; validate them against YouTube Studio audience activity and actual video performance.
 - API-uploaded videos may be restricted to private visibility until the API project meets YouTube's audit requirements.
