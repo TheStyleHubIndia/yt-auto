@@ -53,8 +53,8 @@ def _parse(txt):
 def _gemini(prompt):
     import urllib.request
     key = os.environ["GEMINI_API_KEY"]
-    preferred = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
-    models = list(dict.fromkeys([preferred, "gemini-2.5-flash", "gemini-2.0-flash"]))
+    preferred = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    models = list(dict.fromkeys([preferred, "gemini-3.8-flash", "gemini-3.1-pro-preview"]))
     # Discover models available to this key; availability differs by project.
     try:
         list_req = urllib.request.Request(
