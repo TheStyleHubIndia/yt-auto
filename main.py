@@ -98,7 +98,7 @@ def run_channel(cfg, channel, con, used_slots=None):
     meta = drive_io.sidecar_meta(drive, channel["drive_ready_folder_id"], video["name"])
     generated = None
     # Generate metadata if any important field is missing, including hashtags.
-    description_hashtags = re.findall(r"(?<!\\w)#[A-Za-z0-9_]+", str(meta.get("description", "")))
+    description_hashtags = re.findall(r"(?<!\w)#[A-Za-z0-9_]+", str(meta.get("description", "")))
     if (
         not meta.get("title")
         or not meta.get("description")
@@ -120,10 +120,10 @@ def run_channel(cfg, channel, con, used_slots=None):
     meta["tags"] = meta.get("tags") if isinstance(meta.get("tags"), list) else []
 
     # If a custom description has too few hashtags, add relevant ones from Gemini output.
-    description_hashtags = re.findall(r"(?<!\\w)#[A-Za-z0-9_]+", meta["description"])
+    description_hashtags = re.findall(r"(?<!\w)#[A-Za-z0-9_]+", meta["description"])
     if len(description_hashtags) < 3 and generated:
         generated_hashtags = re.findall(
-            r"(?<!\\w)#[A-Za-z0-9_]+", generated.get("description", "")
+            r"(?<!\w)#[A-Za-z0-9_]+", generated.get("description", "")
         )
         for hashtag in generated_hashtags:
             if hashtag.lower() not in {item.lower() for item in description_hashtags}:
@@ -132,7 +132,7 @@ def run_channel(cfg, channel, con, used_slots=None):
             if len(description_hashtags) >= 5:
                 break
     if channel.get("is_short", True) and "#shorts" not in meta["description"].lower():
-        meta["description"] = (meta["description"] + "\\n\\n#Shorts").strip()
+        meta["description"] = (meta["description"] + "\n\n#Shorts").strip()
     meta["description"] = meta["description"][:5000]
 
     path = drive_io.download(drive, video["id"], video["name"])
