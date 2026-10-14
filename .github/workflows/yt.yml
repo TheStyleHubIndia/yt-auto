@@ -37,7 +37,9 @@ jobs:
           CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
           TOKEN_CHANNELA_JSON: ${{ secrets.TOKEN_CHANNELA_JSON }}
           CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          test -n "$GEMINI_API_KEY" || (echo "::error::Missing GEMINI_API_KEY secret. Add it in GitHub Actions secrets." && exit 1)
           test -n "$CLIENT_SECRET_JSON" || (echo "::error::Missing CLIENT_SECRET_JSON secret" && exit 1)
           test -n "$TOKEN_CHANNELA_JSON" || (echo "::error::Missing TOKEN_CHANNELA_JSON secret" && exit 1)
           test -n "$CONFIG_YAML" || (echo "::error::Missing CONFIG_YAML secret" && exit 1)
