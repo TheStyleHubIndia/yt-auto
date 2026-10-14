@@ -59,7 +59,14 @@ def run_channel(cfg, channel, con, used_slots=None):
     measured = learner.measure(ch, ya, con)
     print(f"[{ch}] analytics refreshed; {measured} eligible upload records checked")
 
-    video = drive_io.next_video(drive, channel["drive_ready_folder_id"])
+    # Exclude files already recorded in the database, even if a Drive move previously failed.
+    processed_ids = {
+        row["source_file_id"] for row in con.execute(
+            "SELECT source_file_id FROM uploads WHERE channel=? AND source_file_id IS NOT NULL",
+            (ch,),
+        ).fetchall()
+    }
+    video = drive_io.next_video(drive, channel["drive_ready_folder_id"], processed_ids)
     if not video:
         print(f"[{ch}] ready folder empty; nothing to upload")
         return False
@@ -91,7 +98,12 @@ def run_channel(cfg, channel, con, used_slots=None):
     if not meta.get("title") or not meta.get("description"):
         best, worst = learner.title_insights(con, ch)
         generated = titles.generate(cfg, channel, video["name"], best, worst)
-        meta = {**generated, **meta}
+        # Keep valid sidecar values, but never let blank sidecar fields erase generated metadata.
+        meta = {
+            "title": meta.get("title") or generated.get("title"),
+            "description": meta.get("description") or generated.get("description"),
+            "tags": meta.get("tags") or generated.get("tags") or [],
+        }
     meta["title"] = str(meta.get("title", video["name"]))[:100]
     meta["description"] = str(meta.get("description", ""))[:5000]
     meta["tags"] = meta.get("tags") if isinstance(meta.get("tags"), list) else []
