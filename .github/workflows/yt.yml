@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - ".github/workflows/yt.yml"
+      - "*.py"
+      - "requirements.txt"
+      - "config.example.yaml"
   schedule:
     # Daily 20:00 Asia/Kolkata (14:30 UTC)
     - cron: "30 14 * * *"
