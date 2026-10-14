@@ -8,15 +8,15 @@ from urllib.error import HTTPError, URLError
 def _clean_topic(filename):
     stem = Path(filename).stem
     stem = re.sub(r"[_-]+", " ", stem)
-    stem = re.sub(r"\\s+", " ", stem).strip()
-    stem = re.sub(r"\\b(final|final edit|export|1080p|720p|4k)\\b", "", stem, flags=re.I)
-    stem = re.sub(r"\\s+", " ", stem).strip(" -_")
+    stem = re.sub(r"\s+", " ", stem).strip()
+    stem = re.sub(r"\b(final|final edit|export|1080p|720p|4k)\b", "", stem, flags=re.I)
+    stem = re.sub(r"\s+", " ", stem).strip(" -_")
     return stem[:100] or "Amazing Facts"
 
 
 def _prompt(channel, filename, best, worst):
     topic = _clean_topic(filename)
-    return "\\n".join([
+    return "\n".join([
         "Channel niche: %s." % channel["niche"],
         "Video filename/topic clue: %s." % topic,
         "The audience is English-speaking viewers in the US, UK, Canada, and Australia.",
@@ -34,7 +34,7 @@ def _prompt(channel, filename, best, worst):
 def _parse(txt):
     txt = txt.strip()
     if txt.startswith("```"):
-        txt = re.sub(r"^```(?:json)?\\s*|\\s*```$", "", txt, flags=re.I)
+        txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt, flags=re.I)
     data = json.loads(txt)
     if not isinstance(data, dict):
         raise ValueError("AI metadata must be a JSON object")
@@ -106,8 +106,8 @@ def template_meta(niche, filename=""):
         hashtags.extend(["#Facts", "#LearnSomethingNew"])
     title = topic if topic.lower().endswith("#shorts") else topic + " #Shorts"
     description = (
-        "Discover: %s.\\n\\n"
+        "Discover: %s.\n\n"
         "Follow FACTORA MINDS for more interesting facts and explainers. "
-        "Like and subscribe for more videos.\\n\\n%s"
+        "Like and subscribe for more videos.\n\n%s"
     ) % (topic, " ".join(list(dict.fromkeys(hashtags))[:5]))
     return {"title": title[:100], "description": description[:5000], "tags": tags}
