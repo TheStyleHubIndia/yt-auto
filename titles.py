@@ -19,7 +19,8 @@ def _prompt(channel, filename, best, worst):
     return "\n".join([
         "Channel niche: %s." % channel["niche"],
         "Video filename/topic clue: %s." % topic,
-        "The audience is English-speaking viewers in the US, UK, Canada, and Australia.",
+        "The primary audience is in India. Use concise, natural English by default; use Hindi/Hinglish only when the filename/topic clue clearly indicates it.",
+        "Optimize for YouTube Shorts discovery without keyword stuffing or misleading clickbait.",
         "Create metadata relevant to the filename/topic only; do not claim to have watched the video.",
         "Top-performing titles: %s" % (best or "no data yet"),
         "Low-performing titles to avoid copying: %s" % (worst or "no data yet"),
@@ -66,7 +67,7 @@ def _gemini(prompt):
             item["name"].split("/")[-1] for item in available
             if item.get("name") and "generateContent" in item.get("supportedGenerationMethods", [])
         ]
-        models = list(dict.fromkeys([preferred] + discovered + models))
+        models = list(dict.fromkeys([preferred] + discovered[:2] + models))
     except (HTTPError, URLError, TimeoutError, ValueError):
         pass
     errors = []
@@ -96,7 +97,9 @@ def _gemini(prompt):
             except Exception:
                 api_detail = ""
             errors.append("%s: HTTP %s %s" % (model, exc.code, api_detail))
-            if exc.code not in (400, 404):
+            # Try a small number of alternate models for model-specific quota/availability issues.
+            # If all fail, main.py can still create safe filename-based metadata and continue.
+            if exc.code not in (400, 404, 429):
                 raise RuntimeError("Gemini API request failed (%s)" % exc.code) from exc
         except (URLError, TimeoutError) as exc:
             raise RuntimeError("Gemini network request failed: %s" % type(exc).__name__) from exc
