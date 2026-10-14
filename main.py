@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -95,18 +96,44 @@ def run_channel(cfg, channel, con, used_slots=None):
     used_slots.add(slot)
 
     meta = drive_io.sidecar_meta(drive, channel["drive_ready_folder_id"], video["name"])
-    if not meta.get("title") or not meta.get("description"):
+    generated = None
+    # Generate metadata if any important field is missing, including hashtags.
+    description_hashtags = re.findall(r"(?<!\\w)#[A-Za-z0-9_]+", str(meta.get("description", "")))
+    if (
+        not meta.get("title")
+        or not meta.get("description")
+        or not isinstance(meta.get("tags"), list)
+        or not meta.get("tags")
+        or len(description_hashtags) < 3
+    ):
         best, worst = learner.title_insights(con, ch)
         generated = titles.generate(cfg, channel, video["name"], best, worst)
-        # Keep valid sidecar values, but never let blank sidecar fields erase generated metadata.
+        # Preserve valid custom metadata, but fill missing fields from Gemini.
         meta = {
             "title": meta.get("title") or generated.get("title"),
             "description": meta.get("description") or generated.get("description"),
             "tags": meta.get("tags") or generated.get("tags") or [],
         }
-    meta["title"] = str(meta.get("title", video["name"]))[:100]
-    meta["description"] = str(meta.get("description", ""))[:5000]
+
+    meta["title"] = str(meta.get("title") or video["name"])[:100]
+    meta["description"] = str(meta.get("description") or "").strip()[:5000]
     meta["tags"] = meta.get("tags") if isinstance(meta.get("tags"), list) else []
+
+    # If a custom description has too few hashtags, add relevant ones from Gemini output.
+    description_hashtags = re.findall(r"(?<!\\w)#[A-Za-z0-9_]+", meta["description"])
+    if len(description_hashtags) < 3 and generated:
+        generated_hashtags = re.findall(
+            r"(?<!\\w)#[A-Za-z0-9_]+", generated.get("description", "")
+        )
+        for hashtag in generated_hashtags:
+            if hashtag.lower() not in {item.lower() for item in description_hashtags}:
+                meta["description"] += (" " if meta["description"] else "") + hashtag
+                description_hashtags.append(hashtag)
+            if len(description_hashtags) >= 5:
+                break
+    if channel.get("is_short", True) and "#shorts" not in meta["description"].lower():
+        meta["description"] = (meta["description"] + "\\n\\n#Shorts").strip()
+    meta["description"] = meta["description"][:5000]
 
     path = drive_io.download(drive, video["id"], video["name"])
     try:
