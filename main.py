@@ -1,8 +1,14 @@
-import sys, os, random
+import sys
+import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+
 from common import load_cfg, authorize, authorize_manual, services, db
-import drive_io, learner, titles, uploader
+import drive_io
+import learner
+import titles
+import uploader
+
 
 def next_publish_time(con, ch, slot, tz, max_per_day):
     """Find the next valid publish time in the selected slot's own timezone."""
@@ -20,94 +26,137 @@ def next_publish_time(con, ch, slot, tz, max_per_day):
         iso = t.astimezone(timezone.utc).isoformat()
         local_day = t.strftime("%Y-%m-%d")
         day_count = 0
-        for row in con.execute("SELECT publish_at FROM uploads WHERE channel=?", (ch,)).fetchall():
+        rows = con.execute("SELECT publish_at FROM uploads WHERE channel=?", (ch,)).fetchall()
+        for row in rows:
             try:
                 if datetime.fromisoformat(row["publish_at"].replace("Z", "+00:00")).astimezone(tz).strftime("%Y-%m-%d") == local_day:
                     day_count += 1
-            except Exception:
+            except (TypeError, ValueError):
                 continue
-        dup = con.execute("SELECT 1 FROM uploads WHERE channel=? AND publish_at=?",
-                          (ch, iso)).fetchone()
-        if day_count < max_per_day and not dup:
+        duplicate = con.execute(
+            "SELECT 1 FROM uploads WHERE channel=? AND publish_at=?", (ch, iso)
+        ).fetchone()
+        if day_count < max_per_day and not duplicate:
             return t
     return None
 
-def run_channel(cfg, c, con, used_slots=None):
-    ch = c["name"]
+
+def run_channel(cfg, channel, con, used_slots=None):
+    ch = channel["name"]
     tz = ZoneInfo(cfg["timezone"])
     yt, ya, drive = services(ch)
     measured = learner.measure(ch, ya, con)
     print(f"[{ch}] analytics refreshed; {measured} eligible upload records checked")
-    f = drive_io.next_video(drive, c["drive_ready_folder_id"])
-    if not f:
-        print(f"[{ch}] ready folder empty")
-        return
+
+    video = drive_io.next_video(drive, channel["drive_ready_folder_id"])
+    if not video:
+        print(f"[{ch}] ready folder empty; nothing to upload")
+        return False
+
+    # If upload already succeeded but Drive move failed, finish the move instead of duplicating it.
+    previous = con.execute(
+        "SELECT video_id FROM uploads WHERE channel=? AND source_file_id=?",
+        (ch, video["id"]),
+    ).fetchone()
+    if previous:
+        drive_io.move(drive, video["id"], channel["drive_ready_folder_id"],
+                      channel["drive_uploaded_folder_id"])
+        print(f"[{ch}] source was already uploaded as https://youtu.be/{previous['video_id']}; moved to Uploaded")
+        return True
+
     used_slots = used_slots if used_slots is not None else set()
-    available_slots = [s for s in c["slots"] if s not in used_slots]
+    available_slots = [slot for slot in channel["slots"] if slot not in used_slots]
     if not available_slots:
         print(f"[{ch}] all configured slots used in this run")
-        return
+        return False
+
     slot = learner.choose_slot(con, ch, available_slots, cfg.get("explore_rate", 0.2))
-    used_slots.add(slot)
-    when = next_publish_time(con, ch, slot, tz, c.get("max_uploads_per_day", 3))
+    when = next_publish_time(con, ch, slot, tz, channel.get("max_uploads_per_day", 3))
     if not when:
         print(f"[{ch}] no valid publish time found for slot {slot}")
-        return
-    meta = drive_io.sidecar_meta(drive, c["drive_ready_folder_id"], f["name"])
-    if not meta.get("title"):
+        return False
+    used_slots.add(slot)
+
+    meta = drive_io.sidecar_meta(drive, channel["drive_ready_folder_id"], video["name"])
+    if not meta.get("title") or not meta.get("description"):
         best, worst = learner.title_insights(con, ch)
-        meta = {**titles.generate(cfg, c, f["name"], best, worst), **meta}
-    path = drive_io.download(drive, f["id"], f["name"])
+        generated = titles.generate(cfg, channel, video["name"], best, worst)
+        meta = {**generated, **meta}
+    meta["title"] = str(meta.get("title", video["name"]))[:100]
+    meta["description"] = str(meta.get("description", ""))[:5000]
+    meta["tags"] = meta.get("tags") if isinstance(meta.get("tags"), list) else []
+
+    path = drive_io.download(drive, video["id"], video["name"])
     try:
-        iso = when.astimezone(timezone.utc).isoformat()
-        vid = uploader.upload(yt, path, meta, iso, c["category_id"], c.get("default_tags", []), c["is_short"])
-        con.execute("INSERT INTO uploads(video_id,channel,title,slot,publish_at) VALUES(?,?,?,?,?)",
-                    (vid, ch, meta["title"], slot, iso))
+        publish_iso = when.astimezone(timezone.utc).isoformat()
+        video_id = uploader.upload(
+            yt, path, meta, publish_iso, channel["category_id"],
+            channel.get("default_tags", []), channel.get("is_short", True),
+        )
+        con.execute(
+            "INSERT INTO uploads(video_id,channel,title,slot,publish_at,source_file_id) VALUES(?,?,?,?,?,?)",
+            (video_id, ch, meta["title"], slot, publish_iso, video["id"]),
+        )
         con.commit()
-        drive_io.move(drive, f["id"], c["drive_ready_folder_id"], c["drive_uploaded_folder_id"])
-        print(f"[{ch}] scheduled https://youtu.be/{vid} at {when.isoformat()} (slot {slot})")
+        drive_io.move(drive, video["id"], channel["drive_ready_folder_id"],
+                      channel["drive_uploaded_folder_id"])
+        print(f"[{ch}] scheduled https://youtu.be/{video_id} at {when.isoformat()} (slot {slot})")
+        return True
     finally:
         if os.path.exists(path):
             os.remove(path)
 
+
 def report(cfg, con):
-    for c in cfg["channels"]:
-        print(f"\n== {c['name']} ==")
-        for s, (score, n) in sorted(learner.slot_stats(con, c["name"]).items(),
-                                    key=lambda x: -x[1][0]):
-            print(f"  {s}: avg score {score:.0f} over {n} videos")
+    for channel in cfg["channels"]:
+        ch = channel["name"]
+        print(f"\n== {ch} ==")
+        stats = learner.slot_stats(con, ch)
+        for slot, (score, count) in sorted(stats.items(), key=lambda item: -(item[1][0] or 0)):
+            print(f"  {slot}: avg score {score or 0:.0f} over {count} videos")
         rows = con.execute(
             "SELECT title, views, avg_view_pct, avg_view_sec, minutes_watched, score, measured "
-            "FROM uploads WHERE channel=? ORDER BY publish_at DESC LIMIT 15", (c["name"],)
+            "FROM uploads WHERE channel=? ORDER BY publish_at DESC LIMIT 15", (ch,)
         ).fetchall()
         print("Recent video analytics (metrics may be pending until YouTube reports them):")
-        for r in rows:
-            print(f"  {r['title']} | views={r['views']} | retention={r['avg_view_pct']}% "
-                  f"| avg_sec={r['avg_view_sec']} | watch_min={r['minutes_watched']} "
-                  f"| score={r['score']} | measured={r['measured']}")
+        for row in rows:
+            print(f"  {row['title']} | views={row['views']} | retention={row['avg_view_pct']}% "
+                  f"| avg_sec={row['avg_view_sec']} | watch_min={row['minutes_watched']} "
+                  f"| score={row['score']} | measured={row['measured']}")
+
 
 if __name__ == "__main__":
     cfg = load_cfg()
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "run"
+    command = sys.argv[1] if len(sys.argv) > 1 else "run"
     con = db()
-    if cmd == "auth":
+    failed = False
+
+    if command == "auth":
+        if len(sys.argv) < 3:
+            raise SystemExit("Usage: python main.py auth CHANNEL_NAME")
         authorize(cfg, sys.argv[2])
-    elif cmd == "authm":
+    elif command == "authm":
+        if len(sys.argv) < 3:
+            raise SystemExit("Usage: python main.py authm CHANNEL_NAME")
         authorize_manual(cfg, sys.argv[2])
-    elif cmd == "report":
+    elif command == "report":
         report(cfg, con)
-    elif cmd == "daily":
-        for c in cfg["channels"]:
+    elif command in ("daily", "run"):
+        for channel in cfg["channels"]:
             used_slots = set()
-            for _ in range(c.get("max_uploads_per_day", 3)):
+            attempts = channel.get("max_uploads_per_day", 3) if command == "daily" else 1
+            for _ in range(attempts):
                 try:
-                    run_channel(cfg, c, con, used_slots)
-                except Exception as e:
-                    print(f"[{c['name']}] ERROR: {e}")
+                    worked = run_channel(cfg, channel, con, used_slots)
+                    if not worked:
+                        break
+                except Exception as exc:
+                    failed = True
+                    print(f"[{channel.get('name', 'unknown')}] ERROR: {type(exc).__name__}: {exc}")
                     break
-    elif cmd == "run":
-        for c in cfg["channels"]:
-            try:
-                run_channel(cfg, c, con)
-            except Exception as e:
-                print(f"[{c['name']}] ERROR: {e}")
+    else:
+        raise SystemExit(f"Unknown command '{command}'. Use daily, run, report, auth, or authm.")
+
+    con.close()
+    if failed:
+        raise SystemExit(1)
